@@ -18,7 +18,7 @@ Provides an editor for procedurally creating 3D shape models using source code f
 ### Clone this repository with submodule.
 
 ```
-git clone --recursive https://github.com/taKana671/shapes.git
+git clone --recursive https://github.com/taKana671/3DModelEditor.git
 ```
 
 ### Start the editor
