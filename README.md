@@ -15,9 +15,17 @@ Provides an editor for procedurally creating 3D shape models using source code f
 
 # Usage of editor
 
+### Clone this repository with submodule.
+
 ```
->>> cd shapes
->>> python model_display.py
+git clone --recursive https://github.com/taKana671/shapes.git
+```
+
+### Start the editor
+
+```
+>>> cd 3DModelEditor
+>>> python model_editor.py
 ```
 
 * 3D shape icon buttons change 3D shape models.
