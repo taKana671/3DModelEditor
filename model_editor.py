@@ -28,6 +28,7 @@ from shapes import Capsule
 from shapes import CapsulePrism
 from shapes import RoundedCornerBox
 from shapes import RoundedEdgeBox
+from shapes import Ellipsoid
 from validation import validate
 
 
@@ -54,6 +55,7 @@ SHAPES = {
     'elliptical_prism': EllipticalPrism,
     'rounded_corner_box': RoundedCornerBox,
     'rounded_edge_box': RoundedEdgeBox,
+    'ellipsoid': Ellipsoid
 }
 
 
@@ -95,8 +97,8 @@ class ModelDisplay(ShowBase):
 
     def __init__(self):
         super().__init__()
-        self.disable_mouse()
         # self.setBackgroundColor(0.6, 0.6, 0.6)
+        self.disable_mouse()
         self.render.set_antialias(AntialiasAttrib.MAuto)
         self.setup_light()
 
@@ -616,8 +618,8 @@ EX_INDIVI = {
     'RoundedCornerBox': ['open_left', 'open_right', 'open_front', 'open_back'],
     'Capsule': ['start_slice_cap', 'end_slice_cap', 'segs_tc', 'segs_bc'],
     'RoundedEdgeBox': ['open_left', 'open_right', 'open_front', 'open_back'],
+    'Ellipsoid': ['radius', 'inner_radius']
 }
-
 
 REPLACE_NAMES = {
     'segs_sc_r': 'slice_caps_radial',
