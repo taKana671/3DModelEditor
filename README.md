@@ -15,7 +15,7 @@ Provides an editor for procedurally creating 3D shape models using source code f
 * numpy 2.2.4
 
 # Environment
-* Python 3.12
+* Python 3.13
 * Windows11
 
 # Usage of editor
@@ -37,4 +37,5 @@ git clone --recursive https://github.com/taKana671/3DModelEditor.git
 * Change the parameters in the left input boxes and click the [Reflect Changes] button to reflect the changes in the 3D model.
 * [Toggle Wireframe] button toggles between with and without wireframe.
 * [Toggle Rotation] toggles between rotating and stopping the 3D model.
+
 
