@@ -1,4 +1,27 @@
 import re
+from pydantic import BaseModel, Field, ConfigDict
+
+
+class ConeModel(BaseModel):
+
+    height: float = Field(gt=0, error_messages='')
+    segs_c: int = Field(ge=3)
+    segs_a: int = Field(ge=1)
+    segs_bottom_cap: int = Field(alias="segs_bc", ge=0)
+    segs_top_cap: int = Field(alias="segs_tc", ge=0)
+    slice_deg: float = Field(ge=0, le=360)
+    bottom_radius: float = Field(gt=0)
+    top_radius: float = Field(ge=0)
+    bottom_inner_radius: float = Field(ge=0)
+    top_inner_radius: float = Field(ge=0)
+    slice_caps_radial: int = Field(ge=0)
+    slice_caps_axial: int = Field(ge=0)
+    invert: bool
+
+    model_config = ConfigDict(
+        populate_by_name=True
+    )
+
 
 
 class RegexEqual(str):
