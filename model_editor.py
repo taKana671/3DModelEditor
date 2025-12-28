@@ -1,19 +1,22 @@
 import sys
 import math
+from collections import namedtuple
 from enum import Enum, auto
 from datetime import datetime
 from distutils.util import strtobool
+from pydantic import ValidationError
 
-import direct.gui.DirectGuiGlobals as DGG
 from panda3d.core import Vec3, Vec2, Point3, LColor, Vec4
 from panda3d.core import AmbientLight, DirectionalLight
-from panda3d.core import NodePath, TextNode
+from panda3d.core import NodePath
 from panda3d.core import load_prc_file_data
 from panda3d.core import OrthographicLens, Camera, MouseWatcher, PGTop
-from panda3d.core import TransparencyAttrib, AntialiasAttrib
-from direct.gui.DirectGui import DirectEntry, DirectFrame, DirectLabel, DirectButton, OkDialog
+from panda3d.core import AntialiasAttrib
 from direct.showbase.ShowBase import ShowBase
 from direct.showbase.ShowBaseGlobal import globalClock
+
+
+from panda3d.core import Texture, TextureStage
 
 
 from shapes import Cylinder
@@ -29,7 +32,12 @@ from shapes import CapsulePrism
 from shapes import RoundedCornerBox
 from shapes import RoundedEdgeBox
 from shapes import Ellipsoid
-from validation import validate
+from validation import ConeValidator, CylinderValidator, SphereValidator, TorusValidator, EllipticalPrismValidator
+from validation import BoxValidator, RightTriangularPrismValidator, PlaneValidator, CapsuleValidator, CapsulePrismValidator
+from validation import RoundedCornerBoxValidator, RoundedEdgeBoxValidator, EllipsoidValidator
+from shapes import Icosphere, Cubesphere
+
+from gui import Gui
 
 
 # Without 'framebuffer-multisample' and 'multisamples' settings,
@@ -41,49 +49,24 @@ load_prc_file_data("", """
     multisamples 2
     """)
 
+Shape = namedtuple('Shape', ['model', 'validator'])
+
 
 SHAPES = {
-    'cone': Cone,
-    'cylinder': Cylinder,
-    'torus': Torus,
-    'sphere': Sphere,
-    'box': Box,
-    'triangle': RightTriangularPrism,
-    'plane': Plane,
-    'capsule': Capsule,
-    'capsule_prism': CapsulePrism,
-    'elliptical_prism': EllipticalPrism,
-    'rounded_corner_box': RoundedCornerBox,
-    'rounded_edge_box': RoundedEdgeBox,
-    'ellipsoid': Ellipsoid
+    'cone': Shape(Cone, ConeValidator),
+    'cylinder': Shape(Cylinder, CylinderValidator),
+    'torus': Shape(Torus, TorusValidator),
+    'sphere': Shape(Sphere, SphereValidator),
+    'box': Shape(Box, BoxValidator),
+    'triangle': Shape(RightTriangularPrism, RightTriangularPrismValidator),
+    'plane': Shape(Plane, PlaneValidator),
+    'capsule': Shape(Capsule, CapsuleValidator),
+    'capsule_prism': Shape(CapsulePrism, CapsulePrismValidator),
+    'elliptical_prism': Shape(EllipticalPrism, EllipticalPrismValidator),
+    'rounded_corner_box': Shape(RoundedCornerBox, RoundedCornerBoxValidator),
+    'rounded_edge_box': Shape(RoundedEdgeBox, RoundedEdgeBoxValidator),
+    'ellipsoid': Shape(Ellipsoid, EllipsoidValidator)
 }
-
-
-def is_int(str_val):
-    try:
-        int(str_val, 10)
-    except ValueError:
-        return False
-    else:
-        return True
-
-
-def is_float(str_val):
-    try:
-        float(str_val)
-    except ValueError:
-        return False
-    else:
-        return True
-
-
-def is_bool(str_val):
-    try:
-        strtobool(str_val)
-    except ValueError:
-        return False
-    else:
-        return True
 
 
 class Status(Enum):
@@ -112,9 +95,11 @@ class ModelDisplay(ShowBase):
         self.slct_aspect2d = self.create_gui_region(Vec4(0.3, 1.0, 0.91, 1.0), 'slct')
 
         # Create gui.
-        self.gui = Gui()
-        self.gui.create_control_widgets(self.ctrl_aspect2d)
-        self.gui.create_model_selector(self.slct_aspect2d)
+        self.gui = Gui(
+            controller_parent=self.ctrl_aspect2d,
+            selector_parent=self.slct_aspect2d,
+            model_names=SHAPES.keys()
+        )
 
         # Define variables.
         self.is_rotating = True
@@ -122,15 +107,12 @@ class ModelDisplay(ShowBase):
         self.show_wireframe = True
         self.dragging = False
         self.before_mouse_pos = None
-        self.state = Status.SHOW_MODEL
 
-        # Show default model.
-        self.model_cls = Cone
-        model_maker = self.model_cls()
-        self.gui.set_default_values(model_maker)
-        model = model_maker.create()
+        # Show model.
+        self.model_name = 'cone'
+        model = self.create_new_model()
         self.dispay_model(model, hpr=Vec3(0, 0, 0))
-
+        self.state = Status.SHOW_MODEL
         # self.accept('d', self.toggle_wireframe)
         # self.accept('r', self.toggle_rotation)
 
@@ -138,24 +120,6 @@ class ModelDisplay(ShowBase):
         self.accept('mouse1', self.mouse_click)
         self.accept('mouse1-up', self.mouse_release)
         self.taskMgr.add(self.update, 'update')
-
-    def dispay_model(self, model, hpr=None, scale=4):
-        # If hpr is None, inherit hpr from the current model and remove it.
-        if hpr is None:
-            hpr = self.model.get_hpr()
-            self.model.remove_node()
-
-        self.model = model
-        self.model.set_pos_hpr_scale(Point3(0, 0, 0), hpr, scale)
-        self.model.set_color(LColor(1, 0, 0, 1))
-        self.model.reparent_to(self.render)
-
-        # self.model = self.loader.load_model('torus_20241012130437.bam')
-        # self.model.reparent_to(self.render)
-        # self.model.set_texture(self.loader.load_texture('brick.jpg'))
-
-        if self.show_wireframe:
-            self.model.set_render_mode_wireframe()
 
     def output_bam_file(self):
         model_type = self.model_cls.__name__.lower()
@@ -338,48 +302,60 @@ class ModelDisplay(ShowBase):
 
         self.model.set_hpr(angle)
 
-    def get_input_value(self, label_txt, str_val):
-        if is_int(str_val):
-            return int(str_val)
-
-        if is_float(str_val):
-            return float(str_val)
-
-        if is_bool(str_val):
-            return bool(strtobool(str_val))
-
-        raise ValueError(f'{label_txt}: input value is invalid.')
-
-    def change_model_types(self, name):
-        self.model_cls = SHAPES[name]
+    def change_model_types(self, model_name):
+        self.model_name = model_name
         self.state = Status.REPLACE_CLASS
 
     def reflect_changes(self):
         self.state = Status.REPLACE_MODEL
 
+    def dispay_model(self, model, hpr=None, scale=4):
+        # If hpr is None, inherit hpr from the current model and remove it.
+        if hpr is None:
+            hpr = self.model.get_hpr()
+            self.model.remove_node()
+
+        self.model = model
+        hpr = self.model.get_hpr()
+
+        self.model.set_pos_hpr_scale(Point3(0, 0, 0), hpr, scale)
+        self.model.set_color(LColor(1, 0, 0, 1))
+        self.model.reparent_to(self.render)
+
+        if self.show_wireframe:
+            self.model.set_render_mode_wireframe()
+
     def create_new_model(self):
-        params = {}
+        shape = SHAPES[self.model_name]
+        params = shape.validator()
+        default_params = params.model_dump()
+        self.gui.set_default_values(default_params)
+        model = shape.model(**default_params).create()
+        return model
+
+    def update_model(self):
+        params = self.gui.get_input_values()
+        shape = SHAPES[self.model_name]
 
         try:
-            for label, entry in self.gui.entries.items():
-                if not (label_txt := label['text']):
-                    break
+            result = shape.validator(**params)
+            validated_params = result.model_dump()
+            new_model = shape.model(**validated_params).create()
+        except ValidationError as e:
+            error_info = []
 
-                input_value = self.get_input_value(label_txt, entry.get())
-                validate(label_txt, input_value)
-                params[label_txt] = input_value
+            for err in e.errors():
+                error_info.append(f'{err['loc'][0]}: {err['input']}  {err['msg']}.')
 
-            new_model = self.model_cls(**params).create()
-
-        except ValueError as e:
-            # An error may occur in the self.get_input_value metho
-            # or the create methods of shape classes.
-            error_msg = e.args[0]
-            k, msg = error_msg.split(': ')
-            name = REPLACE_NAMES[k] if k in REPLACE_NAMES else k
-            self.gui.show_dialog(f'{name}: {msg}')
+            self.gui.show_dialog('\n'.join(error_info))
+            print('\n'.join(error_info))
         else:
             return new_model
+
+        # ValidationError example:
+        # e.errors() -> [{'type': 'greater_than_equal', 'loc': ('slice_caps_radial',),
+        #                'msg': 'Input should be greater than or equal to 0', 'input': '-5',
+        #                'ctx': {'ge': 0}, 'url': 'https://errors.pydantic.dev/2.12/v/greater_than_equal'}]
 
     def update(self, task):
         dt = globalClock.get_dt()
@@ -398,245 +374,16 @@ class ModelDisplay(ShowBase):
                             self.rotate_camera(mouse_pos, dt)
 
             case Status.REPLACE_MODEL:
-                if new_model := self.create_new_model():
-                    self.dispay_model(new_model)
+                if model := self.update_model():
+                    self.dispay_model(model)
                 self.state = Status.SHOW_MODEL
 
             case Status.REPLACE_CLASS:
-                model_maker = self.model_cls()
-                self.gui.set_default_values(model_maker)
-                self.dispay_model(model_maker.create())
+                model = self.create_new_model()
+                self.dispay_model(model)
                 self.state = Status.SHOW_MODEL
 
         return task.cont
-
-
-class Frame(DirectFrame):
-
-    def __init__(self, parent, size):
-        super().__init__(
-            parent=parent,
-            frameSize=size,
-            frameColor=Gui.frame_color,
-            pos=Point3(0, 0, 0),
-            relief=DGG.SUNKEN,
-            borderWidth=(0.01, 0.01)
-        )
-        self.initialiseoptions(type(self))
-        self.set_transparency(TransparencyAttrib.MAlpha)
-
-
-class Gui:
-
-    frame_color = LColor(0.6, 0.6, 0.6, 1)
-    text_color = LColor(1.0, 1.0, 1.0, 1.0)
-
-    def __init__(self):
-        self.font = base.loader.load_font('fonts/DejaVuSans.ttf')
-        self.text_size = 0.05
-
-        base.accept('tab', self.change_focus, [True])
-        base.accept('shift-tab', self.change_focus, [False])
-
-    def create_control_widgets(self, parent):
-        frame = Frame(
-            parent,
-            Vec4(-0.6, 0.6, -1., 1.),  # (left, right, bottom, top)
-        )
-
-        last_z = self.create_input_boxes(frame)
-        _ = self.create_control_btns(frame, last_z)
-
-    def create_model_selector(self, parent):
-        frame = Frame(
-            parent,
-            Vec4(-1.4, 1.4, -0.09, 0.09),  # (left, right, bottom, top)
-        )
-
-        self.create_model_select_btns(frame)
-
-    def create_model_select_btns(self, parent):
-        start_x = -1.31
-        start_z = 0
-        btn_size = 0.16
-        half = btn_size / 2
-
-        for i, text in enumerate(SHAPES.keys()):
-            x = start_x + i * btn_size
-
-            DirectButton(
-                parent=parent,
-                image=f'icons/{text}.png',
-                image_scale=0.05,
-                pos=Point3(x, 0, start_z),
-                relief=DGG.RAISED,
-                frameSize=(-half, half, -half, half),
-                frameColor=self.frame_color,
-                text_fg=self.text_color,
-                text_scale=self.text_size,
-                text_font=self.font,
-                text_pos=(0, -0.01),
-                borderWidth=(0.01, 0.01),
-                command=base.change_model_types,
-                extraArgs=[text]
-            )
-
-    def create_input_boxes(self, parent):
-        self.entries = {}
-        start_z = 0.88
-
-        for i in range(16):
-            z = start_z - i * 0.1
-
-            label = DirectLabel(
-                parent=parent,
-                pos=Point3(0.2, 0.0, z),
-                frameColor=LColor(1, 1, 1, 0),
-                text='',
-                text_fg=self.text_color,
-                text_font=self.font,
-                text_scale=self.text_size,
-                text_align=TextNode.ARight
-            )
-
-            entry = DirectEntry(
-                parent=parent,
-                pos=Point3(0.25, 0, z),
-                relief=DGG.SUNKEN,
-                frameColor=self.frame_color,
-                text_fg=self.text_color,
-                width=5,
-                scale=self.text_size,
-                numLines=1,
-                text_font=self.font,
-                initialText='',
-            )
-            self.entries[label] = entry
-
-            if i == 0:
-                entry['focus'] = 1
-
-        return z
-
-    def create_control_btns(self, parent, start_z):
-        buttons = [
-            ('Reflect Changes', base.reflect_changes),
-            ('Output BamFile', base.output_bam_file),
-            ('Toggle Wireframe', base.toggle_wireframe),
-            ('Toggle Rotation', base.toggle_rotation),
-        ]
-
-        start_z -= 0.18
-
-        for i, (text, cmd) in enumerate(buttons):
-            q, mod = divmod(i, 2)
-            x = -0.255 + mod * 0.51
-            z = start_z - 0.1 * q
-
-            DirectButton(
-                parent=parent,
-                pos=Point3(x, 0, z),
-                relief=DGG.RAISED,
-                frameSize=(-0.255, 0.255, -0.05, 0.05),
-                frameColor=self.frame_color,
-                borderWidth=(0.01, 0.01),
-                text=text,
-                text_fg=self.text_color,
-                text_scale=self.text_size,
-                text_font=self.font,
-                text_pos=(0, -0.01),
-                command=cmd
-            )
-        return z
-
-    def set_default_values(self, instance):
-        keys = [k for k in instance.__dict__.keys() if k not in EX_COMMON]
-
-        if (name := instance.__class__.__name__) in EX_INDIVI:
-            keys = [k for k in keys if k not in EX_INDIVI[name]]
-
-        key_cnt = len(keys)
-
-        for i, (label, entry) in enumerate(self.entries.items()):
-            if i < key_cnt:
-                k = keys[i]
-                label_txt = REPLACE_NAMES[k] if k in REPLACE_NAMES else k
-                label.setText(label_txt)
-                defalut_val = instance.__dict__[k]
-                entry.enterText(str(defalut_val))
-                continue
-
-            label.setText('')
-            entry.enterText('')
-
-    def change_focus(self, go_down):
-        entries = list(self.entries.values())
-
-        for i, entry in enumerate(entries):
-            if entry['focus']:
-                if go_down:
-                    next_idx = i + 1 if i < len(self.entries) - 1 else 0
-                else:
-                    next_idx = len(self.entries) - 1 if i == 0 else i - 1
-
-                entry['focus'] = 0
-                entries[next_idx]['focus'] = 1
-                break
-
-    def show_dialog(self, msg):
-        self.dialog = OkDialog(
-            dialogName='validation',
-            frameSize=(-1, 1, -0.2, 0.1),
-            frameColor=self.frame_color,
-            relief=DGG.FLAT,
-            pos=Point3(0.5, 0, 0.8),
-            midPad=0.02,
-            text=msg,
-            text_scale=self.text_size,
-            text_font=self.font,
-            text_fg=self.text_color,
-            buttonSize=(-0.08, 0.08, -0.05, 0.05),
-            buttonTextList=['OK'],
-            button_frameColor=self.frame_color,
-            button_text_pos=(0, -0.01),
-            button_text_scale=0.04,
-            button_text_fg=self.text_color,
-            command=self.withdraw_dialog
-        )
-
-    def withdraw_dialog(self, btn):
-        def withdraw(task):
-            self.dialog.cleanup()
-            return task.done
-        base.taskMgr.do_method_later(0.5, withdraw, 'withdraw')
-
-
-EX_COMMON = ('bottom_center', 'top_center', 'center', 'fmt', 'color', 'stride')
-
-EX_INDIVI = {
-    'CapsulePrism': ['open_left', 'open_right', 'open_front', 'open_back'],
-    'RoundedCornerBox': ['open_left', 'open_right', 'open_front', 'open_back'],
-    'Capsule': ['start_slice_cap', 'end_slice_cap', 'segs_tc', 'segs_bc'],
-    'RoundedEdgeBox': ['open_left', 'open_right', 'open_front', 'open_back'],
-    'Ellipsoid': ['radius', 'inner_radius']
-}
-
-REPLACE_NAMES = {
-    'segs_sc_r': 'slice_caps_radial',
-    'segs_sc_a': 'slice_caps_axial',
-    'segs_bc': 'segs_bottom_cap',
-    'segs_tc': 'segs_top_cap',
-    'segs_sc': 'segs_slice_caps',
-    'segs_sssc': 'section_slice_start_cap',
-    'segs_ssec': 'section_slice_end_cap',
-    'segs_rssp': 'ring_slice_start_cap',
-    'segs_rsec': 'ring_slice_end_cap',
-    'c_radius': 'corner_radius',
-    'rf_left': 'rounded_f_left',
-    'rf_right': 'rounded_f_right',
-    'rb_left': 'rounded_b_left',
-    'rb_right': 'rounded_b_right'
-}
 
 
 if __name__ == '__main__':

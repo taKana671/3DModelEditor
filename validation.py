@@ -24,7 +24,7 @@ class ConeValidator(ShapeBase):
     top_inner_radius: float = Field(ge=0, default=0.0)
     slice_caps_radial: int = Field(ge=0, alias='segs_sc_r', default=2)
     slice_caps_axial: int = Field(ge=0, alias='segs_sc_a', default=2)
-    invert: bool
+    invert: bool = False
 
 
 class CylinderValidator(ShapeBase):
@@ -59,7 +59,7 @@ class CapsuleValidator(ShapeBase):
     segs_a: int = Field(ge=1, default=2)
     ring_slice_deg: float = Field(ge=0, le=360, default=0.0)
     slice_caps_radial: int = Field(ge=0, alias='segs_sc_r', default=2)
-    slice_caps_axial: int = Field(ge=0, alias='segs_sc_a')
+    slice_caps_axial: int = Field(ge=0, alias='segs_sc_a', default=2)
     top_hemisphere: bool = True
     bottom_hemisphere: bool = True
     invert: bool = False
