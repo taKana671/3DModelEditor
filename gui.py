@@ -24,10 +24,13 @@ class Gui:
 
     frame_color = LColor(0.6, 0.6, 0.6, 1)
     text_color = LColor(1.0, 1.0, 1.0, 1.0)
+    text_size = 0.05
+    font_file = 'fonts/DejaVuSans.ttf'
 
     def __init__(self, controller_parent, selector_parent, model_names):
-        self.font = base.loader.load_font('fonts/DejaVuSans.ttf')
-        self.text_size = 0.05
+        self.font = base.loader.load_font(self.font_file)
+        self.entries = {}
+        self.buttons = []
         self.create_widgets(controller_parent, selector_parent, model_names)
 
         base.accept('tab', self.change_focus, [True])
@@ -69,25 +72,22 @@ class Gui:
         for i, model_name in enumerate(model_names):
             x = start_x + i * btn_size
 
-            DirectButton(
+            btn = DirectButton(
                 parent=parent,
-                image=f'icons/{model_name}.png',
-                image_scale=0.05,
                 pos=Point3(x, 0, start_z),
                 relief=DGG.RAISED,
                 frameSize=(-half, half, -half, half),
                 frameColor=self.frame_color,
-                text_fg=self.text_color,
-                text_scale=self.text_size,
-                text_font=self.font,
-                text_pos=(0, -0.01),
                 borderWidth=(0.01, 0.01),
+                text_pos=(0, -0.01),
+                image=f'icons/{model_name}.png',
+                image_scale=0.05,
                 command=base.change_model_types,
                 extraArgs=[model_name]
             )
+            self.buttons.append(btn)
 
     def create_input_boxes(self, parent):
-        self.entries = {}
         start_z = 0.88
 
         for i in range(16):
@@ -130,7 +130,6 @@ class Gui:
             ('Toggle Wireframe', base.toggle_wireframe),
             ('Toggle Rotation', base.toggle_rotation),
         ]
-
         start_z -= 0.18
 
         for i, (text, cmd) in enumerate(buttons):
@@ -138,7 +137,7 @@ class Gui:
             x = -0.255 + mod * 0.51
             z = start_z - 0.1 * q
 
-            DirectButton(
+            btn = DirectButton(
                 parent=parent,
                 pos=Point3(x, 0, z),
                 relief=DGG.RAISED,
@@ -152,6 +151,8 @@ class Gui:
                 text_pos=(0, -0.01),
                 command=cmd
             )
+            self.buttons.append(btn)
+
         return z
 
     def set_default_values(self, params):
@@ -193,6 +194,8 @@ class Gui:
                 break
 
     def show_dialog(self, msgs):
+        self.change_buttons_state(DGG.DISABLED)
+
         lines = len(msgs)
         bottom = -0.001 * lines / 2 - 0.15
         top = 0.001 * lines / 2 + 0.01
@@ -218,8 +221,14 @@ class Gui:
             command=self.withdraw_dialog
         )
 
+    def change_buttons_state(self, state):
+        for button in self.buttons:
+            button['state'] = state
+
     def withdraw_dialog(self, btn):
         def withdraw(task):
             self.dialog.cleanup()
+            self.change_buttons_state(DGG.NORMAL)
             return task.done
-        base.taskMgr.do_method_later(0.5, withdraw, 'withdraw')
+
+        base.taskMgr.do_method_later(0.2, withdraw, 'withdraw')

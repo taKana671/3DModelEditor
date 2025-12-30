@@ -343,7 +343,6 @@ class ModelDisplay(ShowBase):
             new_model = shape.model(**validated_params).create()
         except ValidationError as e:
             error_info = []
-
             for err in e.errors():
                 error_info.append(f'{err['loc'][0]}: {err['input']}  {err['msg']}.')
 
