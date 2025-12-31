@@ -1,14 +1,10 @@
-from pydantic import BaseModel, Field, ConfigDict, model_validator, field_validator, ValidationInfo
+from pydantic import Field, field_validator, ValidationInfo
 from pydantic_core import PydanticCustomError, ValidationError, InitErrorDetails
 
-
-class ShapeBase(BaseModel):
-
-    model_config = ConfigDict(
-        validate_by_name=True,
-        validate_by_alias=True,
-        extra='ignore'
-    )
+from base_validator import (ShapeBase,
+                            InnerRadiusValidator,
+                            SphericalValidator,
+                            RoundedBoxValidator)
 
 
 class ConeValidator(ShapeBase):
@@ -28,7 +24,7 @@ class ConeValidator(ShapeBase):
     invert: bool = False
 
 
-class CylinderValidator(ShapeBase):
+class CylinderValidator(InnerRadiusValidator):
 
     radius: float = Field(gt=0, default=1.0)
     inner_radius: float = Field(ge=0, default=0.0)
@@ -44,28 +40,8 @@ class CylinderValidator(ShapeBase):
     end_slice_cap: bool = True
     invert: bool = False
 
-    @field_validator('inner_radius', mode='after')
-    @classmethod
-    def validate_inner_radius(cls, inner_radius: float, info: ValidationInfo):
-        # I used field_validator instead of model_validator to show validation errors on both model-level and field-level.
-        # I could not find how to do so by using model_validator.
-        if inner_radius > info.data['radius']:
-            error_details = InitErrorDetails(
-                type=PydanticCustomError('value_error', 'must be inner_radius <= radius'),
-                loc=('inner_radius',),
-                input=inner_radius,
-                ctx={}
-            )
 
-            raise ValidationError.from_exception_data(
-                title=cls.__class__.__name__,
-                line_errors=[error_details]
-            )
-
-        return inner_radius
-
-
-class CapsuleValidator(ShapeBase):
+class CapsuleValidator(InnerRadiusValidator):
 
     radius: float = Field(gt=0, default=1.0)
     inner_radius: float = Field(ge=0, default=0.0)
@@ -79,26 +55,8 @@ class CapsuleValidator(ShapeBase):
     bottom_hemisphere: bool = True
     invert: bool = False
 
-    @field_validator('inner_radius', mode='after')
-    @classmethod
-    def validate_inner_radius(cls, inner_radius: float, info: ValidationInfo):
-        if inner_radius > info.data['radius']:
-            error_details = InitErrorDetails(
-                type=PydanticCustomError('value_error', 'must be inner_radius <= radius'),
-                loc=('inner_radius',),
-                input=inner_radius,
-                ctx={}
-            )
 
-            raise ValidationError.from_exception_data(
-                title=cls.__class__.__name__,
-                line_errors=[error_details]
-            )
-
-        return inner_radius
-
-
-class SphereValidator(ShapeBase):
+class SphereValidator(SphericalValidator):
 
     radius: float = Field(gt=0, default=1.0)
     inner_radius: float = Field(ge=0, default=0.0)
@@ -112,50 +70,13 @@ class SphereValidator(ShapeBase):
     top_clip: float = Field(le=1, default=1)
     invert: bool = False
 
-    @field_validator('inner_radius', mode='after')
-    @classmethod
-    def validate_inner_radius(cls, inner_radius: float, info: ValidationInfo):
-        if inner_radius > info.data['radius']:
-            error_details = InitErrorDetails(
-                type=PydanticCustomError('value_error', 'must be inner_radius <= radius'),
-                loc=('inner_radius',),
-                input=inner_radius,
-                ctx={}
-            )
-
-            raise ValidationError.from_exception_data(
-                title=cls.__class__.__name__,
-                line_errors=[error_details]
-            )
-
-        return inner_radius
-
-    @field_validator('top_clip', mode='after')
-    @classmethod
-    def validate_top_clip(cls, top_clip: float, info: ValidationInfo):
-        # if self.inner_radius > self.radius:
-        #     raise ValueError('must be inner_radius <= radius.')
-        if top_clip < info.data['bottom_clip']:
-            error_details = InitErrorDetails(
-                type=PydanticCustomError('value_error', 'must be top_clip >= bottom_clip'),
-                loc=('top_clip',),
-                input=top_clip,
-                ctx={}
-            )
-
-            raise ValidationError.from_exception_data(
-                title=cls.__class__.__name__,
-                line_errors=[error_details]
-            )
-        return top_clip
-
 
 class TorusValidator(ShapeBase):
 
     segs_r: int = Field(ge=3, default=40)
     segs_s: int = Field(ge=3, default=20)
-    ring_radius: float = Field(gt=0, default=1.0)
     section_radius: float = Field(gt=0, default=0.5)
+    ring_radius: float = Field(gt=0, default=1.0)
     section_inner_radius: float = Field(ge=0, default=0.0)
     ring_slice_deg: float = Field(ge=0, le=360, default=0.0)
     section_slice_deg: float = Field(ge=0, le=360, default=0.0)
@@ -165,12 +86,43 @@ class TorusValidator(ShapeBase):
     ring_slice_end_cap: int = Field(alias='segs_rsec', ge=0, default=2)
     invert: bool = False
 
-    @model_validator(mode='after')
-    def validate_torus(self):
-        if self.section_inner_radius > self.section_radius:
-            raise ValueError('must be section_inner_radius <= section_radius.')
+    @field_validator('ring_radius', mode='after')
+    @classmethod
+    def validate_ring_radius(cls, ring_radius: float, info: ValidationInfo):
+        error_details = []
 
-        return self
+        if 'section_radius' in info.data and ring_radius < info.data['section_radius']:
+            error_details = InitErrorDetails(
+                type=PydanticCustomError('value_error', 'ring_radius >= section_radius'),
+                loc=('ring_radius',),
+                input=ring_radius,
+                ctx={}
+            )
+
+            raise ValidationError.from_exception_data(
+                title=cls.__name__,
+                line_errors=[error_details]
+            )
+
+        return ring_radius
+
+    @field_validator('section_inner_radius', mode='after')
+    @classmethod
+    def validate_section_inner_radius(cls, section_inner_radius: float, info: ValidationInfo):
+        if 'section_radius' in info.data and section_inner_radius > info.data['section_radius']:
+            error_details = InitErrorDetails(
+                type=PydanticCustomError('value_error', 'section_inner_radius <= section_radius'),
+                loc=('section_inner_radius',),
+                input=section_inner_radius,
+                ctx={}
+            )
+
+            raise ValidationError.from_exception_data(
+                title=cls.__name__,
+                line_errors=[error_details]
+            )
+
+        return section_inner_radius
 
 
 class BoxValidator(ShapeBase):
@@ -250,9 +202,13 @@ class EllipticalPrismValidator(ShapeBase):
     def validate_thickness(cls, thickness: float, info: ValidationInfo):
         # I used field_validator instead of model_validator to show validation errors on both model-level and field-level.
         # I could not find how to do so by using model_validator.
-        if thickness * 2 > min(info.data['major_axis'], info.data['minor_axis']):
+        if ('major_axis' in info.data and 'minor_axis' in info.data) and \
+                thickness * 2 >= min(info.data['major_axis'], info.data['minor_axis']):
             error_details = InitErrorDetails(
-                type=PydanticCustomError('value_error', 'must be thickness x 2 <= min(major_axis, minor_axis)'),
+                type=PydanticCustomError(
+                    'value_error',
+                    'must be thickness x 2 <= min(major_axis, minor_axis)'
+                ),
                 loc=('thickness',),
                 input=thickness,
                 ctx={}
@@ -265,33 +221,7 @@ class EllipticalPrismValidator(ShapeBase):
         return thickness
 
 
-    # @model_validator(mode='after')
-    # def validate_elliptical_prism(self):
-    #     # import pdb; pdb.set_trace()
-    #     if self.thickness * 2 > min(self.major_axis, self.minor_axis):
-    #         # raise ValueError('must be thickness x 2 <= min(major_axis, minor_axis).')
-    #         error_details = InitErrorDetails(
-    #             type=PydanticCustomError('value_error', 'must be thickness x 2 <= min(major_axis, minor_axis).'),
-    #             loc=('thickness',),
-    #             input=(self.thickness),
-    #             ctx={}
-    #         )
-
-    #         raise ValidationError.from_exception_data(
-    #             title=self.__class__.__name__,
-    #             line_errors=[error_details]
-    #         )
-
-    #     return self
-    
-
-
-
-
-
-
-
-class RoundedCornerBoxValidator(ShapeBase):
+class RoundedCornerBoxValidator(RoundedBoxValidator):
 
     width: float = Field(gt=0, default=2.0)
     depth: float = Field(gt=0, default=2.0)
@@ -300,27 +230,17 @@ class RoundedCornerBoxValidator(ShapeBase):
     segs_d: int = Field(gt=1, default=4)
     segs_z: int = Field(gt=1, default=4)
     thickness: float = Field(ge=0, default=0.0)
+    corner_radius: float = Field(ge=0, default=0.5)
     open_top: bool = False
     open_bottom: bool = False
-    corner_radius: float = Field(ge=0, default=0.5)
     rounded_f_left: bool = True
     rounded_f_right: bool = True
     rounded_b_left: bool = True
     rounded_b_right: bool = True
     invert: bool = False
 
-    @model_validator(mode='after')
-    def validate_rounded_corner_box(self):
-        if self.corner_radius * 2 > min(self.width, self.depth):
-            raise ValueError('must be corner_radius x 2 <= min(width, depth).')
 
-        if self.thickness > self.corner_radius:
-            raise ValueError('must be thickness <= corner_radius.')
-
-        return self
-
-
-class RoundedEdgeBoxValidator(ShapeBase):
+class RoundedEdgeBoxValidator(RoundedBoxValidator):
 
     width: float = Field(gt=0, default=2.0)
     depth: float = Field(gt=0, default=2.0)
@@ -334,42 +254,61 @@ class RoundedEdgeBoxValidator(ShapeBase):
     open_bottom: bool = False
     invert: bool = False
 
-    @model_validator(mode='after')
-    def validate_rounded_edge_box(self):
-        if self.corner_radius * 2 > min(self.width, self.depth, self.height):
-            raise ValueError('must be corner_radius x 2 <= min(width, depth, self.heigh).')
-
-        if self.thickness > self.corner_radius:
-            raise ValueError('must be thickness <= corner_radius.')
-
-        return self
-
 
 class EllipsoidValidator(ShapeBase):
 
     major_axis: float = Field(gt=0, default=2.0)
     minor_axis: float = Field(gt=0, default=1.0)
-    thickness: float = Field(ge=0, default=0.0)
     segs_h: int = Field(ge=3, default=40)
     segs_v: int = Field(ge=3, default=40)
+    bottom_clip: float = Field(ge=-1, le=1, default=-1)
+    top_clip: float = Field(le=1, default=1)
+    thickness: float = Field(ge=0, default=0.0)
+    slice_deg: float = Field(ge=0, le=360, default=0.0)
     segs_top_cap: int = Field(alias='segs_tc', ge=0, default=3)
     segs_bottom_cap: int = Field(alias='segs_bc', ge=0, default=3)
     segs_slice_caps: int = Field(alias="segs_sc", ge=0, default=2)
-    slice_deg: float = Field(ge=0, le=360, default=0.0)
-    bottom_clip: float = Field(ge=-1, le=1, default=-1)
-    top_clip: float = Field(le=1, default=1)
     invert: bool = False
 
-    @model_validator(mode='after')
-    def validate_ellipsoid(self):
-        if self.thickness * 2 > min(self.major_axis, self.minor_axis):
-            raise ValueError('must be thickness * 2 <= min(major_axis, minor_axis).')
+    @field_validator('thickness', mode='after')
+    @classmethod
+    def validate_thickness(cls, thickness: float, info: ValidationInfo):
+        error_details = []
 
-        half = self.minor_axis / 2
-        if self.thickness * 2 > (self.top_clip - self.bottom_clip) * half:
-            raise ValueError('must be thickness * 2 <= (top_clip - bottom_clip) * minor_axis / 2.')
+        # if ('major_axis' in info.data and 'minor_axis' in info.data) and \
+        #         thickness * 2 > min(info.data['major_axis'], info.data['minor_axis']):
+        #     error_details.append(
+        #         InitErrorDetails(
+        #             type=PydanticCustomError(
+        #                 'value_error',
+        #                 'must be thickness x 2 <= min(major_axis, minor_axis)'
+        #             ),
+        #             loc=('thickness',),
+        #             input=thickness,
+        #             ctx={}
+        #         )
+        #     )
 
-        if self.top_clip < self.bottom_clip:
-            raise ValueError('must be top_clip >= bottom_clip.')
+        if all(k in info.data for k in ('major_axis', 'minor_axis', 'top_clip', 'bottom_clip')):
+            half = min(info.data['major_axis'], info.data['minor_axis']) / 2
 
-        return self
+            if thickness * 2 >= (info.data['top_clip'] - info.data['bottom_clip']) * half:
+                error_details.append(
+                    InitErrorDetails(
+                        type=PydanticCustomError(
+                            'value_error',
+                            'must be thickness * 2 <= (top_clip - bottom_clip) * min(minor_axis, major_axis) / 2'
+                        ),
+                        loc=('thickness',),
+                        input=thickness,
+                        ctx={}
+                    )
+                )
+
+        if error_details:
+            raise ValidationError.from_exception_data(
+                title=cls.__name__,
+                line_errors=error_details
+            )
+
+        return thickness
