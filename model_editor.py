@@ -3,41 +3,51 @@ import math
 from collections import namedtuple
 from enum import Enum, auto
 from datetime import datetime
-from distutils.util import strtobool
-from pydantic import ValidationError
 
+from direct.showbase.ShowBase import ShowBase
+from direct.showbase.ShowBaseGlobal import globalClock
 from panda3d.core import Vec3, Vec2, Point3, LColor, Vec4
 from panda3d.core import AmbientLight, DirectionalLight
 from panda3d.core import NodePath
 from panda3d.core import load_prc_file_data
 from panda3d.core import OrthographicLens, Camera, MouseWatcher, PGTop
 from panda3d.core import AntialiasAttrib
-from direct.showbase.ShowBase import ShowBase
-from direct.showbase.ShowBaseGlobal import globalClock
-
-
 from panda3d.core import Texture, TextureStage
-
-
-from shapes import Cylinder
-from shapes import Sphere
-from shapes import Torus
-from shapes import Cone
-from shapes import Box
-from shapes import RightTriangularPrism
-from shapes import Plane
-from shapes import EllipticalPrism
-from shapes import Capsule
-from shapes import CapsulePrism
-from shapes import RoundedCornerBox
-from shapes import RoundedEdgeBox
-from shapes import Ellipsoid
-from validation import ConeValidator, CylinderValidator, SphereValidator, TorusValidator, EllipticalPrismValidator
-from validation import BoxValidator, RightTriangularPrismValidator, PlaneValidator, CapsuleValidator, CapsulePrismValidator
-from validation import RoundedCornerBoxValidator, RoundedEdgeBoxValidator, EllipsoidValidator
-from shapes import Icosphere, Cubesphere
+from pydantic import ValidationError
 
 from gui import Gui
+from shapes import (
+    Cylinder,
+    Sphere,
+    Torus,
+    Cone,
+    Box,
+    RightTriangularPrism,
+    Plane,
+    EllipticalPrism,
+    Capsule,
+    CapsulePrism,
+    RoundedCornerBox,
+    RoundedEdgeBox,
+    Ellipsoid,
+    # Icosphere,
+    # Cubesphere
+)
+from validators import (
+    ConeValidator,
+    CylinderValidator,
+    TorusValidator,
+    SphereValidator,
+    BoxValidator,
+    RightTriangularPrismValidator,
+    PlaneValidator,
+    CapsuleValidator,
+    CapsulePrismValidator,
+    EllipticalPrismValidator,
+    RoundedCornerBoxValidator,
+    RoundedEdgeBoxValidator,
+    EllipsoidValidator
+)
 
 
 # Without 'framebuffer-multisample' and 'multisamples' settings,
@@ -48,6 +58,7 @@ load_prc_file_data("", """
     framebuffer-multisample 1
     multisamples 2
     """)
+
 
 Shape = namedtuple('Shape', ['model', 'validator'])
 
@@ -342,12 +353,12 @@ class ModelDisplay(ShowBase):
             validated_params = result.model_dump()
             new_model = shape.model(**validated_params).create()
         except ValidationError as e:
+            print(e.errors())
             error_info = []
             for err in e.errors():
                 error_info.append(f'{err['loc'][0]}: {err['input']}  {err['msg']}.')
 
             self.gui.show_dialog('\n'.join(error_info))
-            print('\n'.join(error_info))
         else:
             return new_model
 

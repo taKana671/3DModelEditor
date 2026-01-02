@@ -202,9 +202,10 @@ class Gui:
 
         self.dialog = OkDialog(
             dialogName='validation',
-            frameSize=(-1, 1, bottom, top),
+            frameSize=(-1.2, 1.2, bottom, top),
             # frameSize=(-1, 1, -0.2, 0.1),
-            frameColor=self.frame_color,
+            frameColor=(1, 1, 1, 0),
+            # frameColor=self.frame_color,
             relief=DGG.FLAT,
             pos=Point3(0.5, 0, 0.0),
             midPad=0.02,

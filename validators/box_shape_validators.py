@@ -1,4 +1,4 @@
-from pydantic import field_validator, ValidationInfo, Field
+from pydantic import field_validator, Field, ValidationInfo
 from pydantic_core import PydanticCustomError, ValidationError, InitErrorDetails
 
 from .base_validator import ShapeBase
@@ -18,7 +18,7 @@ class BoxBaseValidator(ShapeBase):
                         'value_error',
                         f'must be thickness x 2 < min({list(keys)})'
                     ),
-                    loc=('thickness',),
+                    # loc=('thickness',),
                     input=thickness,
                     ctx={}
                 )
@@ -66,7 +66,7 @@ class RoundedBoxValidator(BoxBaseValidator):
                     'value_error',
                     f'must be corner_radius x 2 < min({keys})'
                 ),
-                loc=('corner_radius',),
+                # loc=('corner_radius',),
                 input=corner_radius,
                 ctx={}
             )
@@ -90,7 +90,7 @@ class RoundedBoxValidator(BoxBaseValidator):
                     type=PydanticCustomError(
                         'value_error',
                         'must be thickness <= corner_radius'),
-                    loc=('thickness',),
+                    # loc=('thickness',),
                     input=thickness,
                     ctx={}
                 )

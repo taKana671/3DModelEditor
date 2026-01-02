@@ -1,4 +1,4 @@
-from pydantic import field_validator, ValidationInfo, Field
+from pydantic import field_validator, Field, ValidationInfo
 from pydantic_core import PydanticCustomError, ValidationError, InitErrorDetails
 
 
@@ -32,7 +32,7 @@ class ConeValidator(ShapeBase):
                     'value_error',
                     f'must be {info.field_name} <= {target_name}'
                 ),
-                loc=(info.field_name,),
+                # loc=(info.field_name,),
                 input=v,
                 ctx={}
             )

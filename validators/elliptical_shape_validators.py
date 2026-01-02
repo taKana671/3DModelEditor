@@ -1,4 +1,4 @@
-from pydantic import field_validator, ValidationInfo, Field
+from pydantic import field_validator, Field, ValidationInfo
 from pydantic_core import PydanticCustomError, ValidationError, InitErrorDetails
 
 from .base_validator import ShapeBase
@@ -22,16 +22,14 @@ class EllipticalPrismValidator(ShapeBase):
     @field_validator('thickness', mode='after')
     @classmethod
     def validate_thickness(cls, thickness: float, info: ValidationInfo):
-        # I used field_validator instead of model_validator to show validation errors on both model-level and field-level.
-        # I could not find how to do so by using model_validator.
         if ('major_axis' in info.data and 'minor_axis' in info.data) and \
-                thickness * 2 >= min(info.data['major_axis'], info.data['minor_axis']):
+                thickness * 2 > min(info.data['major_axis'], info.data['minor_axis']):
             error_details = InitErrorDetails(
                 type=PydanticCustomError(
                     'value_error',
                     'must be thickness x 2 <= min(major_axis, minor_axis)'
                 ),
-                loc=('thickness',),
+                # loc=('thickness',),
                 input=thickness,
                 ctx={}
             )
@@ -48,7 +46,7 @@ class EllipsoidValidator(ShapeBase):
     major_axis: float = Field(gt=0, default=2.0)
     minor_axis: float = Field(gt=0, default=1.0)
     segs_h: int = Field(ge=3, default=40)
-    segs_v: int = Field(ge=3, default=40)
+    segs_v: int = Field(ge=2, default=40)
     bottom_clip: float = Field(ge=-1, le=1, default=-1)
     top_clip: float = Field(le=1, default=1)
     thickness: float = Field(ge=0, default=0.0)
@@ -63,31 +61,17 @@ class EllipsoidValidator(ShapeBase):
     def validate_thickness(cls, thickness: float, info: ValidationInfo):
         error_details = []
 
-        # if ('major_axis' in info.data and 'minor_axis' in info.data) and \
-        #         thickness * 2 > min(info.data['major_axis'], info.data['minor_axis']):
-        #     error_details.append(
-        #         InitErrorDetails(
-        #             type=PydanticCustomError(
-        #                 'value_error',
-        #                 'must be thickness x 2 <= min(major_axis, minor_axis)'
-        #             ),
-        #             loc=('thickness',),
-        #             input=thickness,
-        #             ctx={}
-        #         )
-        #     )
-
         if all(k in info.data for k in ('major_axis', 'minor_axis', 'top_clip', 'bottom_clip')):
             half = min(info.data['major_axis'], info.data['minor_axis']) / 2
 
-            if thickness * 2 >= (info.data['top_clip'] - info.data['bottom_clip']) * half:
+            if thickness * 2 > (info.data['top_clip'] - info.data['bottom_clip']) * half:
                 error_details.append(
                     InitErrorDetails(
                         type=PydanticCustomError(
                             'value_error',
-                            'must be thickness * 2 <= (top_clip - bottom_clip) * min(minor_axis, major_axis) / 2'
+                            'must be thickness x 2 <= (top_clip - bottom_clip) x min(minor_axis, major_axis) / 2'
                         ),
-                        loc=('thickness',),
+                        # loc=('thickness',),
                         input=thickness,
                         ctx={}
                     )

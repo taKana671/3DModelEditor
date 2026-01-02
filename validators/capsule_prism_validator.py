@@ -1,4 +1,4 @@
-from pydantic import field_validator, ValidationInfo, Field
+from pydantic import field_validator, Field, ValidationInfo
 from pydantic_core import PydanticCustomError, ValidationError, InitErrorDetails
 
 from .base_validator import ShapeBase
@@ -29,7 +29,7 @@ class CapsulePrismValidator(ShapeBase):
                     'value_error',
                     'must be thickness x 2 < depth'
                 ),
-                loc=('thickness',),
+                # loc=('thickness',),
                 input=thickness,
                 ctx={}
             )

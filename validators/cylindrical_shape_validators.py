@@ -1,4 +1,4 @@
-from pydantic import field_validator, ValidationInfo, Field
+from pydantic import field_validator, Field, ValidationInfo
 from pydantic_core import PydanticCustomError, ValidationError, InitErrorDetails
 
 from .base_validator import ShapeBase
@@ -14,7 +14,7 @@ class InnerRadiusValidator(ShapeBase):
         if 'radius' in info.data and inner_radius > info.data['radius']:
             error_details = InitErrorDetails(
                 type=PydanticCustomError('value_error', 'must be inner_radius <= radius'),
-                loc=('inner_radius',),
+                # loc=('inner_radius',),
                 input=inner_radius,
                 ctx={}
             )
