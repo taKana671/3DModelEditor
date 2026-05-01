@@ -4,6 +4,7 @@ from collections import namedtuple
 from enum import Enum, auto
 from datetime import datetime
 
+# import numpy as np
 from direct.showbase.ShowBase import ShowBase
 from direct.showbase.ShowBaseGlobal import globalClock
 from panda3d.core import Vec3, Vec2, Point3, LColor, Vec4
@@ -12,7 +13,6 @@ from panda3d.core import NodePath
 from panda3d.core import load_prc_file_data
 from panda3d.core import OrthographicLens, Camera, MouseWatcher, PGTop
 from panda3d.core import AntialiasAttrib
-from panda3d.core import Texture, TextureStage
 from pydantic import ValidationError
 
 from gui import Gui
@@ -31,7 +31,10 @@ from shapes import (
     RoundedEdgeBox,
     Ellipsoid,
     # Icosphere,
-    # Cubesphere
+    # Cubesphere,
+    # RandomConvexPolyhedron,
+    # RandomPolygonalPrism,
+    # Dodecahedron
 )
 from validators import (
     ConeValidator,
@@ -113,8 +116,8 @@ class ModelDisplay(ShowBase):
         )
 
         # Define variables.
-        self.is_rotating = True
-        # self.is_rotating = False
+        # self.is_rotating = True
+        self.is_rotating = False
         self.show_wireframe = True
         self.dragging = False
         self.before_mouse_pos = None
@@ -326,11 +329,28 @@ class ModelDisplay(ShowBase):
             hpr = self.model.get_hpr()
             self.model.remove_node()
 
+        # vertices = [
+        #     np.array([0.49889851, 0.85842498, 0.76998793]),
+        #     np.array([0.88551684, 0.23917097, 0.0218984]),
+        #     np.array([0.88017536, 0.23704328, 0.]),
+        #     np.array([0.11089399, 0.97587645, 0.]),
+        #     np.array([0.11710056, 1., 0.09077217]),
+        #     np.array([0.33434778, 1., 0.72031574]),
+        #     np.array([0.40758976, 0.95513772, 0.79719745])
+        # ]
+        # scale=20
+        # self.model = Icosphere().create()
+        # self.model = Cubesphere().create()
+        # self.model = RandomConvexPolyhedron().create()
+        # self.model = RandomPolygonalPrism(vertices, thickness=0., height=0.1).create()
+        # self.model = Dodecahedron().create()
+
         self.model = model
         hpr = self.model.get_hpr()
 
         self.model.set_pos_hpr_scale(Point3(0, 0, 0), hpr, scale)
         self.model.set_color(LColor(1, 0, 0, 1))
+        # self.model.set_texture(base.loader.load_texture('brick.jpg'))
         self.model.reparent_to(self.render)
 
         if self.show_wireframe:
