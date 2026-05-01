@@ -39,8 +39,8 @@ class CylinderValidator(InnerRadiusValidator):
     ring_slice_deg: float = Field(ge=0, le=360, default=0.0)
     slice_caps_radial: int = Field(ge=0, alias='segs_sc_r', default=4)
     slice_caps_axial: int = Field(ge=0, alias='segs_sc_a', default=4)
-    start_slice_cap: bool = True
-    end_slice_cap: bool = True
+    # start_slice_cap: bool = True
+    # end_slice_cap: bool = True
     invert: bool = False
 
 
