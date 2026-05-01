@@ -116,8 +116,8 @@ class ModelDisplay(ShowBase):
         )
 
         # Define variables.
-        # self.is_rotating = True
-        self.is_rotating = False
+        self.is_rotating = True
+        # self.is_rotating = False
         self.show_wireframe = True
         self.dragging = False
         self.before_mouse_pos = None
