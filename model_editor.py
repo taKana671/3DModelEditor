@@ -136,14 +136,14 @@ class ModelDisplay(ShowBase):
         self.taskMgr.add(self.update, 'update')
 
     def output_bam_file(self):
-        model_type = self.model_cls.__name__.lower()
         num = datetime.now().strftime('%Y%m%d%H%M%S')
-        filename = f'{model_type}_{num}.bam'
+        filename = f'{self.model_name}_{num}.bam'
 
         output_model = self.model.copy_to(self.render)
         output_model.set_render_mode_filled()
         output_model.set_hpr(Vec3(0, 0, 0))
         output_model.set_color(LColor(1, 1, 1, 1))
+        output_model.set_scale(Vec3(1))
         output_model.flatten_strong()
 
         # output_mode.clear_color()
@@ -328,22 +328,6 @@ class ModelDisplay(ShowBase):
         if hpr is None:
             hpr = self.model.get_hpr()
             self.model.remove_node()
-
-        # vertices = [
-        #     np.array([0.49889851, 0.85842498, 0.76998793]),
-        #     np.array([0.88551684, 0.23917097, 0.0218984]),
-        #     np.array([0.88017536, 0.23704328, 0.]),
-        #     np.array([0.11089399, 0.97587645, 0.]),
-        #     np.array([0.11710056, 1., 0.09077217]),
-        #     np.array([0.33434778, 1., 0.72031574]),
-        #     np.array([0.40758976, 0.95513772, 0.79719745])
-        # ]
-        # scale=20
-        # self.model = Icosphere().create()
-        # self.model = Cubesphere().create()
-        # self.model = RandomConvexPolyhedron().create()
-        # self.model = RandomPolygonalPrism(vertices, thickness=0., height=0.1).create()
-        # self.model = Dodecahedron().create()
 
         self.model = model
         hpr = self.model.get_hpr()
